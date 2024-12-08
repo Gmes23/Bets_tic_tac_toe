@@ -1,7 +1,7 @@
 # Tic Tac Toe on Sui: React + Sui Client Integration
 ## Overview
 This tutorial demonstrates how to use the React frontend application to interact with the Tic Tac Toe game deployed on the Sui blockchain. Players can connect wallets, create games, join existing games using an object ID, and play the game to completion.
-A working version of this project can be found at [vercel] (https://tic-tac-toe-omega-dun.vercel.app/)
+A working version of this project can be found at [vercel] (https://bets-tic-tac-3pntjbzhn-gerardo-mestanzas-projects.vercel.app/)
 
 ### Features
 - Blockchain-Powered Gameplay: Game logic is executed through a Sui Move smart contract.
