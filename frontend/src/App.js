@@ -46,6 +46,7 @@ function GameApp() {
   const [joinGameObjectId, setJoinGameObjectId] = useState("");
   const [winnerAddress, setWinnerAddress] = useState(null);
   const [betAmount, setBetAmount] = useState(0);
+  const [gameHistory, setGameHistory] = useState([]);
 
   // Function to connect the wallet
   const connectWallet = () => {
@@ -307,6 +308,42 @@ function GameApp() {
     }
   }, [createdObjectId]);
 
+  // Add this new function to fetch game history
+  const fetchGameHistory = useCallback(async () => {
+    try {
+      const gameResults = await client.queryEvents({
+        query: {
+          MoveEventType: "0x223ed03eb4cca1b9f4c1a952b1dd252715f7bf0c15dae4e607d4174ac4ce92b3::game::GameResult"
+        }
+      });
+      console.log(gameResults, "this is gameResults")
+      const formattedHistory = gameResults.data.map(event => ({
+        gameId: event.parsedJson.game_id,
+        winner: event.parsedJson.winner,
+        status: event.parsedJson.status,
+        payoutAmount: event.parsedJson.payout_amount,
+        timestamp: new Date(event.timestampMs).toLocaleString(),
+        transactionDigest: event.id.txDigest
+      }));
+
+      setGameHistory(formattedHistory);
+    } catch (error) {
+      console.error("Failed to fetch game history:", error);
+    }
+  }, []);
+
+  // Add this useEffect to fetch history periodically
+  useEffect(() => {
+    fetchGameHistory();
+    const interval = setInterval(fetchGameHistory, 10000); // Refresh every 10 seconds
+    return () => clearInterval(interval);
+  }, [fetchGameHistory]);
+
+  // Add this new function after fetchGameHistory
+  const handleRowClick = (transactionDigest) => {
+    window.open(`https://testnet.suivision.xyz/txblock/${transactionDigest}`, '_blank');
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       
@@ -390,6 +427,44 @@ function GameApp() {
           )}
         </div>
       )}
+      <div className="w-full max-w-4xl mt-8 mb-8">
+        <h2 className="text-2xl font-bold mb-4">Game History</h2>
+        <div className="overflow-auto max-h-64">
+          <table className="min-w-full bg-white border border-gray-300">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 border-b">Game ID</th>
+                <th className="px-4 py-2 border-b">Winner</th>
+                <th className="px-4 py-2 border-b">Status</th>
+                <th className="px-4 py-2 border-b">Payout (SUI)</th>
+                <th className="px-4 py-2 border-b">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gameHistory.map((game, index) => (
+                <tr 
+                  key={index} 
+                  className="hover:bg-gray-50 cursor-pointer" 
+                  onClick={() => handleRowClick(game.transactionDigest)}
+                >
+                  <td className="px-4 py-2 border-b">{game.gameId.substring(0, 8)}...</td>
+                  <td className="px-4 py-2 border-b">
+                    {game.status === 3 ? "Draw" : 
+                     `${game.winner.substring(0, 8)}...`}
+                  </td>
+                  <td className="px-4 py-2 border-b">
+                    {game.status === 1 ? "X Won" : 
+                     game.status === 2 ? "O Won" : 
+                     game.status === 3 ? "Draw" : "Unknown"}
+                  </td>
+                  <td className="px-4 py-2 border-b">{game.payoutAmount / 1000000000}</td>
+                  <td className="px-4 py-2 border-b">{game.timestamp}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
