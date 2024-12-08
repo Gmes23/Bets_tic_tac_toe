@@ -5,6 +5,9 @@ module tic_tac_toe::game {
     use std::vector;
     use sui::event;
     use sui::object::ID;
+    use sui::balance::{Self, Balance};
+    use sui::coin::{Self, Coin};
+    use sui::sui::SUI;
 
     // Error constants
     const INVALID_MOVE: u64 = 0;
@@ -14,6 +17,7 @@ module tic_tac_toe::game {
     const POSITION_TAKEN: u64 = 4;
     const PLAYER_ALREADY_JOINED: u64 = 5;
     const GAME_NOT_STARTED: u64 = 6;
+    const INVALID_BET_AMOUNT: u64 = 7;
 
     // Game status
     const IN_PROGRESS: u8 = 0;
@@ -28,23 +32,28 @@ module tic_tac_toe::game {
         player_o: address,
         current_turn: address,
         status: u8,
+        pot: Balance<SUI>,    // Total betting pool
+        bet_amount: u64       // Required bet amount
     }
 
     public struct GameResult has copy, drop {
         game_id: ID,
         winner: address,
-        status: u8
+        status: u8,
+        payout_amount: u64    // Amount won
     }
 
     // === Events ===
     public struct GameCreated has copy, drop {
         game_id: ID,
-        player_x: address
+        player_x: address,
+        bet_amount: u64
     }
 
     public struct PlayerJoined has copy, drop {
         game_id: ID,
-        player_o: address
+        player_o: address,
+        bet_amount: u64
     }
 
     public struct MoveMade has copy, drop {
@@ -55,8 +64,10 @@ module tic_tac_toe::game {
 
     // === Public functions ===
 
-    public fun create_game(ctx: &mut TxContext) {
+    public fun create_game(bet: Coin<SUI>, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
+        let bet_amount = coin::value(&bet);
+        
         let game = Game {
             id: object::new(ctx),
             board: vector[0,0,0,0,0,0,0,0,0],
@@ -64,26 +75,34 @@ module tic_tac_toe::game {
             player_o: @0x0,
             current_turn: sender,
             status: IN_PROGRESS,
+            pot: coin::into_balance(bet),
+            bet_amount: bet_amount
         };
 
         event::emit(GameCreated {
             game_id: object::uid_to_inner(&game.id),
-            player_x: sender
+            player_x: sender,
+            bet_amount
         });
 
         transfer::share_object(game);
     }
 
-    public fun join_game(game: &mut Game, ctx: &mut TxContext) {
+    public fun join_game(game: &mut Game, bet: Coin<SUI>, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
+        let bet_amount = coin::value(&bet);
+        
         assert!(game.player_o == @0x0, PLAYER_ALREADY_JOINED);
         assert!(sender != game.player_x, PLAYER_ALREADY_JOINED);
+        assert!(bet_amount == game.bet_amount, INVALID_BET_AMOUNT);
         
+        balance::join(&mut game.pot, coin::into_balance(bet));
         game.player_o = sender;
 
         event::emit(PlayerJoined {
             game_id: object::uid_to_inner(&game.id),
-            player_o: sender
+            player_o: sender,
+            bet_amount
         });
     }
 
@@ -115,7 +134,7 @@ module tic_tac_toe::game {
         };
 
         // Check game status
-        check_game_status(game);
+        check_game_status(game, ctx);
     }
 
     public fun get_game_status(game: &Game): u8 {
@@ -133,22 +152,20 @@ module tic_tac_toe::game {
 
     // === Private functions ===
 
-    fun check_game_status(game: &mut Game) {
-        // Check rows
-        check_line(game, 0, 1, 2);
-        check_line(game, 3, 4, 5);
-        check_line(game, 6, 7, 8);
-
-        // Check columns
-        check_line(game, 0, 3, 6);
-        check_line(game, 1, 4, 7);
-        check_line(game, 2, 5, 8);
-
+    fun check_game_status(game: &mut Game, ctx: &mut TxContext) {
+        // Check all winning combinations
+        check_line(game, 0, 1, 2, ctx);
+        check_line(game, 3, 4, 5, ctx);
+        check_line(game, 6, 7, 8, ctx);
+        //check rows
+        check_line(game, 0, 3, 6, ctx);
+        check_line(game, 1, 4, 7, ctx);
+        check_line(game, 2, 5, 8, ctx);
         // Check diagonals
-        check_line(game, 0, 4, 8);
-        check_line(game, 2, 4, 6);
+        check_line(game, 0, 4, 8, ctx);
+        check_line(game, 2, 4, 6, ctx);
 
-        // Check draw
+        // Check for draw
         if (game.status == IN_PROGRESS) {
             let mut is_full = true;
             let mut i = 0;
@@ -161,16 +178,29 @@ module tic_tac_toe::game {
             };
             if (is_full) {
                 game.status = DRAW;
+                let split_amount = balance::value(&game.pot) / 2;
+                
+                // Return half to each player
+                transfer::public_transfer(
+                    coin::from_balance(balance::split(&mut game.pot, split_amount), ctx),
+                    game.player_x
+                );
+                transfer::public_transfer(
+                    coin::from_balance(balance::withdraw_all(&mut game.pot), ctx),
+                    game.player_o
+                );
+
                 event::emit(GameResult {
                     game_id: object::uid_to_inner(&game.id),
                     winner: @0x0,
-                    status: DRAW
+                    status: DRAW,
+                    payout_amount: split_amount
                 });
             };
         };
     }
 
-    fun check_line(game: &mut Game, a: u64, b: u64, c: u64) {
+    fun check_line(game: &mut Game, a: u64, b: u64, c: u64, ctx: &mut TxContext) {
         let board = &game.board;
         let val_a = *vector::borrow(board, a);
         if (val_a != 0) {
@@ -178,10 +208,20 @@ module tic_tac_toe::game {
             let val_c = *vector::borrow(board, c);
             if (val_a == val_b && val_b == val_c) {
                 game.status = if (val_a == 1) { X_WON } else { O_WON };
+                let winner = if (val_a == 1) { game.player_x } else { game.player_o };
+                let total_pot = balance::value(&game.pot);
+                
+                // Transfer entire pot to winner
+                transfer::public_transfer(
+                    coin::from_balance(balance::withdraw_all(&mut game.pot), ctx), 
+                    winner
+                );
+
                 event::emit(GameResult {
                     game_id: object::uid_to_inner(&game.id),
-                    winner: if (val_a == 1) { game.player_x } else { game.player_o },
-                    status: game.status
+                    winner,
+                    status: game.status,
+                    payout_amount: total_pot
                 });
             }
         }
