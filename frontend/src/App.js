@@ -440,7 +440,7 @@ function GameApp() {
                 <th className="px-4 py-2 border-b">Winner</th>
                 <th className="px-4 py-2 border-b">Status</th>
                 <th className="px-4 py-2 border-b">Payout (SUI)</th>
-                <th className="px-4 py-2 border-b">Time</th>
+                {/* <th className="px-4 py-2 border-b">Time</th> */}
               </tr>
             </thead>
             <tbody>
