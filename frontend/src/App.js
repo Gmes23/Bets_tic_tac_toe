@@ -346,8 +346,7 @@ function GameApp() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      
-      <h1 className="text-4xl font-bold text-blue-600 fixed top-4" style={{ position: "absolute", top: "25vh" }}>Tic Tac Toe</h1>
+      <h1 className="text-4xl font-bold text-blue-600 mb-8">Tic Tac Toe</h1>
       {!isConnected ? (
         <button
           onClick={connectWallet}
@@ -361,7 +360,9 @@ function GameApp() {
           <div className="mb-4">
             <input
               type="number"
-              placeholder="Enter Bet Amount"
+              placeholder="SUI Gas (min 1M)"
+              step="1000000"
+              min="1000000"
               onChange={(e) => setBetAmount(parseInt(e.target.value))}
               className="border border-gray-300 px-4 py-2 mr-2 text-black font-bold"
             />
@@ -383,7 +384,9 @@ function GameApp() {
             />
             <input
               type="number"
-              placeholder="Enter Bet Amount"
+              placeholder="SUI Gas (min 1M)"
+              step="1000000"
+              min="1000000"
               onChange={(e) => setBetAmount(parseInt(e.target.value))}
               className="border border-gray-300 px-4 py-2 mr-2 text-black font-bold"
             />
@@ -420,7 +423,7 @@ function GameApp() {
                   <h4 className="text-lg font-bold tracking-tight text-black-900">
                     Winner is: {trophy === Winner.Draw ? "Draw" : winnerAddress === account?.address ? "You" : "Opponent"}
                   </h4>
-                  {trophy !== Winner.Draw && <p>Winning Player Address: {winnerAddress}</p>}
+                  {trophy !== Winner.Draw && <p className="font-bold tracking-tight text-black-900">Winning Player Address: {winnerAddress}</p>}
                 </div>
               )}
             </div>
@@ -482,4 +485,5 @@ function App() {
 }
 
 export default App;
+
 
