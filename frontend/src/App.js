@@ -447,7 +447,7 @@ function GameApp() {
               {gameHistory.map((game, index) => (
                 <tr 
                   key={index} 
-                  className="hover:bg-gray-50 cursor-pointer" 
+                  className="hover:bg-gray-50 cursor-pointer text-center" 
                   onClick={() => handleRowClick(game.transactionDigest)}
                 >
                   <td className="px-4 py-2 border-b">{game.gameId.substring(0, 8)}...</td>
@@ -461,7 +461,7 @@ function GameApp() {
                      game.status === 3 ? "Draw" : "Unknown"}
                   </td>
                   <td className="px-4 py-2 border-b">{game.payoutAmount / 1000000000}</td>
-                  <td className="px-4 py-2 border-b">{game.timestamp}</td>
+                  {/* <td className="px-4 py-2 border-b">{game.timestamp}</td> */}
                 </tr>
               ))}
             </tbody>
@@ -471,19 +471,5 @@ function GameApp() {
     </div>
   );
 }
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
-        <WalletProvider>
-          <GameApp />
-        </WalletProvider>
-      </SuiClientProvider>
-    </QueryClientProvider>
-  );
-}
-
-export default App;
 
 
